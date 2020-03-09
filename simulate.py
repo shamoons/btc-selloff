@@ -26,9 +26,12 @@ def main():
     btc_usd_frame = pd.read_csv('BTC-USD.csv')
 
     print('Starting....\n')
-    coefficient_1 = np.arange(1e-5, 1e-3, 1e-5)
-    coefficient_2 = np.arange(1e-5, 1e-3, 1e-5)
-    coefficient_3 = np.arange(0, 1000, 100)
+    # coefficient_1 = np.arange(1e-5, 1e-3, 1e-5)
+    # coefficient_2 = np.arange(1e-5, 1e-3, 1e-5)
+    # coefficient_3 = np.arange(0, 1000, 100)
+    coefficient_1 = np.linspace(0, 1e-3, num=10, dtype=np.float16)
+    coefficient_2 = np.linspace(0, 1e-3, num=10, dtype=np.float16)
+    coefficient_3 = np.linspace(0, 1000, num=10, dtype=np.float16)
     coefficients = []
     for c1 in coefficient_1:
         for c2 in coefficient_2:
@@ -127,21 +130,21 @@ def main():
 
         }, name='Ending BTC Price')
 
+        average_btc_price_row = pd.Series({
+            'Mean': results_df['Average BTC Price'].mean(),
+            'STD': results_df['Average BTC Price'].std(),
+            'Median': results_df['Average BTC Price'].median(),
+            'Min': results_df['Average BTC Price'].min(),
+            'Max': results_df['Average BTC Price'].max(),
+            'Range': results_df['Average BTC Price'].max() - results_df['Average BTC Price'].min(),
+
+        }, name='BTC Price')
+
         summary_df = summary_df.append(
-            current_btc_row).append(total_profit_row).append(ending_btc_price_row)
+            current_btc_row).append(total_profit_row).append(ending_btc_price_row).append(average_btc_price_row)
         pd.options.display.float_format = '{:,}'.format
         print(summary_df.round(2))
-        # print('\tCurrent BTC: {:.2f} ± {:.2f}\t|\tMedian: {:.2f}\tRange: {:.2f} - {:.2f} ({:.2f}))'.format(
-        #     results_df['Current BTC'].mean(), results_df['Current BTC'].std(), results_df['Current BTC'].median(), results_df['Current BTC'].min(), results_df['Current BTC'].max(), results_df['Current BTC'].max() - results_df['Current BTC'].min()))
 
-        # print('\tTotal Profit: {:.2f} ± {:.2f}\t|\tMedian: {:.2f}\tRange: {:.2f} - {:.2f} ({:.2f}))'.format(
-        #     results_df['Total Profit'].mean(), results_df['Total Profit'].std(), results_df['Total Profit'].median(), results_df['Total Profit'].min(), results_df['Total Profit'].max(), results_df['Total Profit'].max() - results_df['Total Profit'].min()))
-
-        # print('\tEnding BTC Price: {:.2f} ± {:.2f}\t|\tMedian: {:.2f}\tRange: {:.2f} - {:.2f} ({:.2f}))'.format(
-        #     results_df['Ending BTC Price'].mean(), results_df['Ending BTC Price'].std(), results_df['Ending BTC Price'].median(), results_df['Ending BTC Price'].min(), results_df['Ending BTC Price'].max(), results_df['Ending BTC Price'].max() - results_df['Ending BTC Price'].min()))
-
-        # print('\tAverage BTC Left: {:.2f} ± {:.2f}\n\tAverage Total Profit: {:.2f} ± {:.2f}\n\tAverage Ending BTC Price: {:.2f} ± {:.2f}\t'.format(
-        #     results_df['Current BTC'].mean(), results_df['Current BTC'].std(), results_df['Total Profit'].mean(), results_df['Total Profit'].std(), results_df['Ending BTC Price'].mean(), results_df['Ending BTC Price'].std()))
         print('\t', coefficient)
 
         if best_avg_total_profit < results_df['Total Profit'].mean() and results_df['Total Profit'].std() <= results_df['Total Profit'].mean() / 2:
