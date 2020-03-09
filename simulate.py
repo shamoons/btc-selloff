@@ -14,6 +14,8 @@ def parse_args():
                         type=int, default=52)
     parser.add_argument('--current_price', help='Current price of BTC',
                         type=float, required=True)
+    parser.add_argument('--coefficients', help='Coefficients',
+                        type=float, nargs=3)
 
     args = parser.parse_args()
 
@@ -22,25 +24,28 @@ def parse_args():
 
 def main():
     args = parse_args()
+    param_search = True
 
     btc_usd_frame = pd.read_csv('BTC-USD.csv')
 
     print('Starting....\n')
-    # coefficient_1 = np.arange(1e-5, 1e-3, 1e-5)
-    # coefficient_2 = np.arange(1e-5, 1e-3, 1e-5)
-    # coefficient_3 = np.arange(0, 1000, 100)
-    coefficient_1 = np.linspace(0, 1e-3, num=10, dtype=np.float16)
-    coefficient_2 = np.linspace(0, 1e-3, num=10, dtype=np.float16)
-    coefficient_3 = np.linspace(0, 1000, num=10, dtype=np.float16)
-    coefficients = []
-    for c1 in coefficient_1:
-        for c2 in coefficient_2:
-            for c3 in coefficient_3:
-                coefficients.append([c1, c2, c3])
-    np.random.shuffle(coefficients)
+    if args.coefficients:
+        coefficients = [args.coefficients]
+        print('Using coefficients: ', args.coefficients)
+        param_search = False
+    else:
+        coefficient_1 = np.around(np.linspace(1e-4, 1e-3, num=5), decimals=4)
+        coefficient_2 = np.around(np.linspace(1e-4, 1e-3, num=10), decimals=4)
+        coefficient_3 = np.linspace(0, 1000, num=10, dtype=np.int)
+        coefficients = []
+        for c1 in coefficient_1:
+            for c2 in coefficient_2:
+                for c3 in coefficient_3:
+                    coefficients.append([c1, c2, c3])
+        np.random.shuffle(coefficients)
 
     best_avg_total_profit = 0
-    best_coefficients = []
+    best_coefficients = pd.DataFrame()
     c_index = 0
     for coefficient in coefficients:
         c_index += 1
@@ -59,27 +64,18 @@ def main():
             current_btc_amount = args.total_btc
             weeks = 0
             average_btc_price = 0
+            cnt = 0
             for index, row in sample_frame.iterrows():
-                average_btc_price += current_price
+                cnt += 1
                 percent_change = float(row['Perc Close'].strip('%')) / 100
                 current_price = current_price + current_price * percent_change
+                average_btc_price += current_price
 
-                if index % 7 != 0:
+                if cnt % 7 != 0:
                     continue
                 weeks += 1
                 price_to_sell = coefficient[0] * current_price ** 2 + \
                     coefficient[1] * current_price + coefficient[2]
-
-                # if current_price >= 5000 and current_price < 10000:
-                #     price_to_sell = 1000
-                # elif current_price >= 10000 and current_price < 20000:
-                #     price_to_sell = 2500
-                # elif current_price >= 20000 and current_price < 30000:
-                #     price_to_sell = 5000
-                # elif current_price >= 30000:
-                #     price_to_sell = 10000
-                # elif current_price >= 40000:
-                #     price_to_sell = 20000
 
                 btc_to_sell = price_to_sell / current_price
 
@@ -89,10 +85,6 @@ def main():
                 current_btc_amount = current_btc_amount - btc_to_sell
                 total_profit = total_profit + btc_to_sell * current_price
 
-                # print('Price: {:.2f}\tCurrent BTC Amount: {:.2f}\tTotal Profit: {:.2f}\tSelling {:.2f} at {:.2f}'.format(
-                #     current_price, current_btc_amount, total_profit,  btc_to_sell, price_to_sell))
-
-            # print('weeks', weeks)
             average_btc_price /= len(sample_frame)
             results_df = results_df.append({'Run': run, 'Current BTC': current_btc_amount,
                                             'Total Profit': total_profit, 'Ending BTC Price': current_price, 'Average BTC Price': average_btc_price}, ignore_index=True)
@@ -145,18 +137,30 @@ def main():
         pd.options.display.float_format = '{:,}'.format
         print(summary_df.round(2))
 
-        print('\t', coefficient)
+        if param_search == True:
+            print('\t', coefficient)
 
-        if best_avg_total_profit < results_df['Total Profit'].mean() and results_df['Total Profit'].std() <= results_df['Total Profit'].mean() / 2:
-            best_avg_total_profit = results_df['Total Profit'].mean()
-            best_coefficients = coefficient
-            print('\tBest Average Total Profit: {:.2f}'.format(
-                best_avg_total_profit))
-            open('coefficients.out', 'w').write(
-                str(best_coefficients) + '\n')
-            results_df.to_csv('best_results.csv')
+            if best_avg_total_profit < results_df['Total Profit'].mean() and results_df['Total Profit'].min() >= results_df['Total Profit'].mean() / 3:
+                best_avg_total_profit = results_df['Total Profit'].mean()
+                best_coefficients = best_coefficients.append({
+                    'Total Profit (mean)': results_df['Total Profit'].mean(),
+                    'Total Profit (STD)': results_df['Total Profit'].std(),
+                    'Total Profit (max)': results_df['Total Profit'].max(),
+                    'Total Profit (min)': results_df['Total Profit'].min(),
+                    'c1': coefficient[0],
+                    'c2': coefficient[1],
+                    'c3': coefficient[2]
+                }, ignore_index=True)
+                best_coefficients = best_coefficients.round(5)
 
-        results_df.to_csv('results.csv')
+                print('\nNEW BEST')
+                print(best_coefficients.iloc[[-1]])
+
+                best_coefficients.to_csv('coefficients.csv')
+                results_df.to_csv('best_results.csv')
+
+        if param_search == False:
+            results_df.to_csv('results.csv')
 
 
 if __name__ == '__main__':
