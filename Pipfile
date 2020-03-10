@@ -13,6 +13,7 @@ numpy = "*"
 scipy = "*"
 torch = "*"
 hyperopt = "*"
+wandb = "*"
 
 [requires]
 python_version = "3.7"
