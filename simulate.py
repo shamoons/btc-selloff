@@ -30,6 +30,8 @@ def parse_args():
 
 def objective(args, evaluation=False, log_run=True):
     # print('c1: {}\tc2: {}\tc3: {}'.format(args['c1'], args['c2'], args['c3']))
+    if args['c2'] <= 0 or args['c3'] <= 0:
+        return 1e10
     # if args['c1'] == 0 or args['c2'] == 0 or args['c3'] == 0:
     #     return 1e10
     btc_usd_frame = args['btc_usd_frame']
@@ -62,12 +64,13 @@ def objective(args, evaluation=False, log_run=True):
             #     args['c2'] * current_price + args['c3']
 
             btc_to_sell = args['c1'] + args['c2'] * \
-                math.exp(current_price * args['c3'])
+                math.log(current_price * args['c3'], 10)
+            btc_to_sell = min(btc_to_sell, current_btc_amount)
 
             # btc_to_sell = price_to_sell / current_price
 
             # if current_btc_amount < btc_to_sell or price_to_sell <= 0:
-            if current_btc_amount < btc_to_sell:
+            if btc_to_sell <= 0:
                 continue
 
             current_btc_amount = current_btc_amount - btc_to_sell
@@ -79,8 +82,7 @@ def objective(args, evaluation=False, log_run=True):
                 print('\tCurrent price: {:.2f}'.format(current_price))
                 print('\tAverage price: {:.2f}'.format(
                     average_btc_price / cnt))
-
-                print('\t\tPrice to sell: {:.2f}'.format(price_to_sell))
+                # print('\t\tPrice to sell: {:.2f}'.format(price_to_sell))
                 print(
                     '\t\tBTC to sell: {:.4f} / {:.4f}'.format(btc_to_sell, current_btc_amount))
                 print('\t\tTotal profit: {:.2f}'.format(total_profit))
@@ -89,7 +91,7 @@ def objective(args, evaluation=False, log_run=True):
         results_df = results_df.append({'Run': run, 'Current BTC': current_btc_amount,
                                         'Total Profit': total_profit, 'Ending BTC Price': current_price, 'Average BTC Price': average_btc_price}, ignore_index=True)
 
-    if results_df['Total Profit'].min() < 1000 or results_df['Total Profit'].std() < 1000 or results_df['Total Profit'].max() < 1000:
+    if results_df['Total Profit'].min() < 1000 or results_df['Total Profit'].std() < 1000 or results_df['Total Profit'].max() < 1000 or current_btc_amount == 0:
         score = 1e10
     else:
         score = results_df['Total Profit'].std(
@@ -104,6 +106,7 @@ def objective(args, evaluation=False, log_run=True):
         'Range': results_df['Total Profit'].max() - results_df['Total Profit'].min(),
         'Average BTC Price': average_btc_price,
         'Ending BTC Price': current_price,
+        'Current BTC': current_btc_amount,
         'score': score,
         'c1': args['c1'],
         'c2': args['c2'],
@@ -123,7 +126,8 @@ def objective(args, evaluation=False, log_run=True):
         summary_df = summary_df.append(summary, ignore_index=True)
         wandb.log(summary)
 
-        summary_df.to_csv(path.join(wandb.run.dir, 'coefficients.csv'))
+        with open(path.join(wandb.run.dir, 'coefficients.csv'), 'a') as f:
+            summary_df.to_csv(f, header=f.tell() == 0)
 
     return score
 
@@ -161,9 +165,13 @@ def main():
 
     btc_usd_frame = pd.read_csv('BTC-USD.csv')
 
-    init_c1 = {'mean': 0, 'sigma': 100}
-    init_c2 = {'mean': 0.005, 'sigma': 0.004}
-    init_c3 = {'mean': 0.00002, 'sigma': 0.000001}
+    # init_c1 = {'mean': 2, 'sigma': 0.1}
+    # init_c2 = {'mean': 1.5, 'sigma': 0.1}
+    # init_c3 = {'mean': 0.00001, 'sigma': 0.0001}
+    init_c1 = {'mean': 0.38714, 'sigma': 0.40110}
+    init_c2 = {'mean': 0.23020, 'sigma': 0.24109}
+    init_c3 = {'mean': 0.0008721, 'sigma': 0.0003986}
+
     space = get_space(args, btc_usd_frame, init_c1, init_c2, init_c3)
 
     if evaluation == False:
