@@ -32,8 +32,7 @@ def objective(args, evaluation=False, log_run=True):
     # print('c1: {}\tc2: {}\tc3: {}'.format(args['c1'], args['c2'], args['c3']))
     if args['c2'] <= 0 or args['c3'] <= 0:
         return 1e10
-    # if args['c1'] == 0 or args['c2'] == 0 or args['c3'] == 0:
-    #     return 1e10
+
     btc_usd_frame = args['btc_usd_frame']
     results_df = pd.DataFrame(columns=[
                               'Run', 'Current BTC', 'Total Profit', 'Average BTC Price', 'Ending BTC Price'])
@@ -57,15 +56,16 @@ def objective(args, evaluation=False, log_run=True):
             current_price = current_price + current_price * percent_change
             average_btc_price += current_price
 
-            if cnt % 7 != 0:
+            if cnt % 7 != 0 or current_price <= 5000:
                 continue
             weeks += 1
             # price_to_sell = args['c1'] * current_price ** 2 + \
             #     args['c2'] * current_price + args['c3']
 
             btc_to_sell = args['c1'] + args['c2'] * \
-                math.log(current_price * args['c3'], 10)
+                math.log(args['c3'] * (current_price - 5000), 10)
             btc_to_sell = min(btc_to_sell, current_btc_amount)
+            # print('btc_to_sell: {}'.format(btc_to_sell))
 
             # btc_to_sell = price_to_sell / current_price
 
@@ -168,9 +168,12 @@ def main():
     # init_c1 = {'mean': 2, 'sigma': 0.1}
     # init_c2 = {'mean': 1.5, 'sigma': 0.1}
     # init_c3 = {'mean': 0.00001, 'sigma': 0.0001}
-    init_c1 = {'mean': 0.38714, 'sigma': 0.40110}
-    init_c2 = {'mean': 0.23020, 'sigma': 0.24109}
-    init_c3 = {'mean': 0.0008721, 'sigma': 0.0003986}
+    # init_c1 = {'mean': -2, 'sigma': 0.1}
+    # init_c2 = {'mean': 1, 'sigma': 0.1}
+    # init_c3 = {'mean': 0.2, 'sigma': 0.0001}
+    init_c1 = {'mean': -2.2, 'sigma': 1}
+    init_c2 = {'mean': 1, 'sigma': 1}
+    init_c3 = {'mean': 0.2, 'sigma': 1}
 
     space = get_space(args, btc_usd_frame, init_c1, init_c2, init_c3)
 
