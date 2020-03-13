@@ -148,8 +148,8 @@ def get_space(args, btc_usd_frame, init_c1, init_c2, init_c3):
         c3 = args.coefficients[2]
     else:
         c1 = hp.normal('c1', init_c1['mean'], init_c1['sigma'])
-        c2 = hp.normal('c2', init_c2['mean'], init_c2['sigma'])
-        c3 = hp.normal('c3', init_c3['mean'], init_c3['sigma'])
+        c2 = hp.lognormal('c2', init_c2['mean'], init_c2['sigma'])
+        c3 = hp.lognormal('c3', init_c3['mean'], init_c3['sigma'])
 
     return {
         'c1': c1,
