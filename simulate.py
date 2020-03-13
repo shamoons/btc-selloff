@@ -22,6 +22,12 @@ def parse_args():
                         type=float, nargs=3)
     parser.add_argument('--max_evals', help='Max Evals for param search',
                         type=int)
+    parser.add_argument('--c1_init', help='Mean and STD for C1',
+                        type=float, nargs=2)
+    parser.add_argument('--c2_init', help='Mean and STD for C2',
+                        type=float, nargs=2)
+    parser.add_argument('--c3_init', help='Mean and STD for C3',
+                        type=float, nargs=2)
 
     args = parser.parse_args()
 
@@ -36,7 +42,7 @@ def objective(args, evaluation=False, log_run=True):
     btc_usd_frame = args['btc_usd_frame']
     results_df = pd.DataFrame(columns=[
                               'Run', 'Current BTC', 'Total Profit', 'Average BTC Price', 'Ending BTC Price'])
-    for run in range(args['num_runs']):
+    for _ in range(args['num_runs']):
 
         start_index = np.random.randint(
             0, len(btc_usd_frame) - args['num_weeks'] * 7)
@@ -56,14 +62,14 @@ def objective(args, evaluation=False, log_run=True):
             current_price = current_price + current_price * percent_change
             average_btc_price += current_price
 
-            if cnt % 7 != 0 or current_price <= 5000:
+            if cnt % 7 != 0 or current_price <= 2500:
                 continue
             weeks += 1
             # price_to_sell = args['c1'] * current_price ** 2 + \
             #     args['c2'] * current_price + args['c3']
 
             btc_to_sell = args['c1'] + args['c2'] * \
-                math.log(args['c3'] * (current_price - 5000), 10)
+                math.log(args['c3'] * (current_price - 2500), 10)
             btc_to_sell = min(btc_to_sell, current_btc_amount)
             # print('btc_to_sell: {}'.format(btc_to_sell))
 
@@ -88,14 +94,17 @@ def objective(args, evaluation=False, log_run=True):
                 print('\t\tTotal profit: {:.2f}'.format(total_profit))
 
         average_btc_price /= cnt
-        results_df = results_df.append({'Run': run, 'Current BTC': current_btc_amount,
+        results_df = results_df.append({'Current BTC': current_btc_amount,
                                         'Total Profit': total_profit, 'Ending BTC Price': current_price, 'Average BTC Price': average_btc_price}, ignore_index=True)
 
-    if results_df['Total Profit'].min() < 1000 or results_df['Total Profit'].std() < 1000 or results_df['Total Profit'].max() < 1000 or current_btc_amount == 0:
+    if results_df['Total Profit'].min() < 1000 or results_df['Total Profit'].std() < 1000 or results_df['Total Profit'].max() < 1000:
         score = 1e10
     else:
-        score = results_df['Total Profit'].std(
-        ) / (results_df['Total Profit'].min())
+        remaining_btc_ratio = args['total_btc'] / (current_btc_amount + 1e-10)
+        remaining_btc_ratio = remaining_btc_ratio / 10
+
+        score = remaining_btc_ratio + \
+            results_df['Total Profit'].std() / results_df['Total Profit'].min()
 
     summary = {
         'Mean': results_df['Total Profit'].mean(),
@@ -171,9 +180,12 @@ def main():
     # init_c1 = {'mean': -2, 'sigma': 0.1}
     # init_c2 = {'mean': 1, 'sigma': 0.1}
     # init_c3 = {'mean': 0.2, 'sigma': 0.0001}
-    init_c1 = {'mean': -2.2, 'sigma': 1}
-    init_c2 = {'mean': 1, 'sigma': 1}
-    init_c3 = {'mean': 0.2, 'sigma': 1}
+    # init_c1 = {'mean': -2.86151, 'sigma': 2.52158}
+    # init_c2 = {'mean': 0.96487, 'sigma': 0.66938}
+    # init_c3 = {'mean': 2.6609572, 'sigma': 1.50999}
+    init_c1 = {'mean': args.c1_init[0], 'sigma': args.c1_init[1]}
+    init_c2 = {'mean': args.c2_init[0], 'sigma': args.c2_init[1]}
+    init_c3 = {'mean': args.c3_init[0], 'sigma': args.c3_init[1]}
 
     space = get_space(args, btc_usd_frame, init_c1, init_c2, init_c3)
 
@@ -203,127 +215,6 @@ def main():
 
     eval_score = objective(space, evaluation=True, log_run=log_run)
     print('Evaluation Score: ', eval_score)
-
-
-def main2():
-    args = parse_args()
-    param_search = True
-
-    btc_usd_frame = pd.read_csv('BTC-USD.csv')
-
-    print('Starting.... {}\n'.format(args.current_price))
-    if args.coefficients:
-        coefficients = [args.coefficients]
-        print('Using coefficients: ', args.coefficients)
-        param_search = False
-    else:
-        coefficient_1 = np.around(np.linspace(-5e-5, 5e-5, num=20), decimals=5)
-        coefficient_2 = np.around(np.linspace(-1e-2, 1e-2, num=20), decimals=4)
-        coefficient_3 = np.linspace(-2000, 2000, num=20, dtype=np.int)
-        coefficients = []
-        for c1 in coefficient_1:
-            if c1 == 0:
-                continue
-            for c2 in coefficient_2:
-                if c2 == 0 or c1 < 0 and c2 < 0:
-                    continue
-                for c3 in coefficient_3:
-                    if c3 == 0:
-                        continue
-                    coefficients.append([c1, c2, c3])
-        np.random.shuffle(coefficients)
-
-    best_score = 0
-    best_coefficients = pd.DataFrame()
-    c_index = 0
-    for coefficient in coefficients:
-        c_index += 1
-        results_df = pd.DataFrame(
-            columns=['Run', 'Current BTC', 'Total Profit'])
-
-        print(c_index, '/', len(coefficients))
-        summary_df = pd.DataFrame(
-            columns=['Mean', 'STD', 'Median', 'Min', 'Max', 'Range'])
-        current_btc_row = pd.Series({
-            'Mean': results_df['Current BTC'].mean(),
-            'STD': results_df['Current BTC'].std(),
-            'Median': results_df['Current BTC'].median(),
-            'Min': results_df['Current BTC'].min(),
-            'Max': results_df['Current BTC'].max(),
-            'Range': results_df['Current BTC'].max() - results_df['Current BTC'].min(),
-
-        }, name='Current BTC')
-
-        total_profit_row = pd.Series({
-            'Mean': results_df['Total Profit'].mean(),
-            'STD': results_df['Total Profit'].std(),
-            'Median': results_df['Total Profit'].median(),
-            'Min': results_df['Total Profit'].min(),
-            'Max': results_df['Total Profit'].max(),
-            'Range': results_df['Total Profit'].max() - results_df['Total Profit'].min(),
-
-        }, name='Total Profit')
-
-        ending_btc_price_row = pd.Series({
-            'Mean': results_df['Ending BTC Price'].mean(),
-            'STD': results_df['Ending BTC Price'].std(),
-            'Median': results_df['Ending BTC Price'].median(),
-            'Min': results_df['Ending BTC Price'].min(),
-            'Max': results_df['Ending BTC Price'].max(),
-            'Range': results_df['Ending BTC Price'].max() - results_df['Ending BTC Price'].min(),
-
-        }, name='Ending BTC Price')
-
-        average_btc_price_row = pd.Series({
-            'Mean': results_df['Average BTC Price'].mean(),
-            'STD': results_df['Average BTC Price'].std(),
-            'Median': results_df['Average BTC Price'].median(),
-            'Min': results_df['Average BTC Price'].min(),
-            'Max': results_df['Average BTC Price'].max(),
-            'Range': results_df['Average BTC Price'].max() - results_df['Average BTC Price'].min(),
-
-        }, name='BTC Price')
-
-        summary_df = summary_df.append(
-            current_btc_row).append(total_profit_row).append(ending_btc_price_row).append(average_btc_price_row)
-        pd.options.display.float_format = '{:,}'.format
-        print(summary_df.round(2))
-
-        if param_search == True:
-            print('\t', coefficient)
-
-            weight_mean = 1
-            weight_min = 3
-            weight_std = 0
-
-            # weighted_score = (weight_mean * results_df['Total Profit'].mean(
-            # ) + weight_min * results_df['Total Profit'].min()) / (results_df['Total Profit'].std() + 1e-10)
-            weighted_score = results_df['Total Profit'].min(
-            ) / (results_df['Total Profit'].std() + 1e-10)
-
-            if best_score < weighted_score and results_df['Total Profit'].mean() > results_df['Total Profit'].std() * 1:
-
-                best_score = weighted_score
-                best_coefficients = best_coefficients.append({
-                    'Total Profit (mean)': results_df['Total Profit'].mean(),
-                    'Total Profit (std)': results_df['Total Profit'].std(),
-                    'Total Profit (max)': results_df['Total Profit'].max(),
-                    'Total Profit (min)': results_df['Total Profit'].min(),
-                    'c1': coefficient[0],
-                    'c2': coefficient[1],
-                    'c3': coefficient[2],
-                    'score': best_score
-                }, ignore_index=True)
-                best_coefficients = best_coefficients.round(5)
-
-                print('\nNEW BEST')
-                print(best_coefficients.iloc[[-1]])
-
-                best_coefficients.to_csv('coefficients.csv')
-                results_df.to_csv('best_results.csv')
-
-        if param_search == False:
-            results_df.to_csv('results.csv')
 
 
 if __name__ == '__main__':
