@@ -58,7 +58,8 @@ def objective(args, evaluation=False, log_run=True):
         cnt = 0
         for _, row in sample_frame.iterrows():
             cnt += 1
-            percent_change = float(row['Perc Close'].strip('%')) / 100
+            # percent_change = float(row['Perc Close'].strip('%')) / 100
+            percent_change = np.random.normal(0.215172414, 3.826488427) / 100
             current_price = current_price + current_price * percent_change
             average_btc_price += current_price
 
