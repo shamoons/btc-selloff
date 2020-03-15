@@ -101,7 +101,7 @@ def objective(args, evaluation=False, log_run=True):
         score = 1e10
     else:
         remaining_btc_ratio = args['total_btc'] / (current_btc_amount + 1e-10)
-        remaining_btc_ratio = remaining_btc_ratio / 10
+        remaining_btc_ratio = remaining_btc_ratio / 100
 
         score = remaining_btc_ratio + \
             results_df['Total Profit'].std() / results_df['Total Profit'].min()
