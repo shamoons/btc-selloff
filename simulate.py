@@ -28,6 +28,8 @@ def parse_args():
                         type=float, nargs=2)
     parser.add_argument('--c3_init', help='Mean and STD for C3',
                         type=float, nargs=2)
+    parser.add_argument('--btc_weight', help='How much to weigh remaining BTC',
+                        type=float, default=5)
 
     args = parser.parse_args()
 
@@ -101,8 +103,8 @@ def objective(args, evaluation=False, log_run=True):
     if results_df['Total Profit'].min() < 1000 or results_df['Total Profit'].std() < 1000 or results_df['Total Profit'].max() < 1000:
         score = 1e10
     else:
-        remaining_btc_ratio = args['total_btc'] / (current_btc_amount + 1e-10)
-        remaining_btc_ratio = remaining_btc_ratio / 100
+        remaining_btc_ratio = current_btc_amount / args['total_btc']
+        remaining_btc_ratio = remaining_btc_ratio * args['btc_weight']
 
         score = remaining_btc_ratio + \
             results_df['Total Profit'].std() / results_df['Total Profit'].min()
@@ -123,15 +125,12 @@ def objective(args, evaluation=False, log_run=True):
         'c3': args['c3']
     }
 
-    if evaluation == True:
+    if evaluation:
         results_df.to_csv('results.csv')
         print(summary)
-        # wandb.run.summary = summary
-        # wandb.run.summary.update()
-        # print(results_df)
         print('Saved to: results.csv')
 
-    if log_run == True:
+    if log_run:
         summary_df = pd.DataFrame()
         summary_df = summary_df.append(summary, ignore_index=True)
         wandb.log(summary)
@@ -160,7 +159,8 @@ def get_space(args, btc_usd_frame, init_c1, init_c2, init_c3):
         'total_btc': args.total_btc,
         'num_runs': args.num_runs,
         'num_weeks': args.num_weeks,
-        'btc_usd_frame': btc_usd_frame
+        'btc_usd_frame': btc_usd_frame,
+        'btc_weight': args.btc_weight
     }
 
 
@@ -178,9 +178,11 @@ def main():
     # init_c1 = {'mean': 2, 'sigma': 0.1}
     # init_c2 = {'mean': 1.5, 'sigma': 0.1}
     # init_c3 = {'mean': 0.00001, 'sigma': 0.0001}
+
     # init_c1 = {'mean': -2, 'sigma': 0.1}
     # init_c2 = {'mean': 1, 'sigma': 0.1}
     # init_c3 = {'mean': 0.2, 'sigma': 0.0001}
+
     # init_c1 = {'mean': -2.86151, 'sigma': 2.52158}
     # init_c2 = {'mean': 0.96487, 'sigma': 0.66938}
     # init_c3 = {'mean': 2.6609572, 'sigma': 1.50999}
@@ -190,7 +192,7 @@ def main():
 
     space = get_space(args, btc_usd_frame, init_c1, init_c2, init_c3)
 
-    if evaluation == False:
+    if not evaluation:
         wandb.init(project="btc-sell", config={
             "Max Eval": args.max_evals,
             "Num Runs": args.num_runs,
@@ -201,7 +203,8 @@ def main():
             'C2_mean': init_c2['mean'],
             'C2_sigma': init_c2['sigma'],
             'C3_mean': init_c3['mean'],
-            'C3_sigma': init_c3['sigma']
+            'C3_sigma': init_c3['sigma'],
+            'BTC Weight': args.btc_weight
         })
 
         best = fmin(objective,
