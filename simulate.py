@@ -103,8 +103,8 @@ def objective(args, evaluation=False, log_run=True):
     if results_df['Total Profit'].min() < 1000 or results_df['Total Profit'].std() < 1000 or results_df['Total Profit'].max() < 1000:
         score = 1e10
     else:
-        remaining_btc_ratio = current_btc_amount / args['total_btc']
-        remaining_btc_ratio = remaining_btc_ratio * args['btc_weight']
+        remaining_btc_ratio = args['total_btc'] / \
+            (current_btc_amount * args['btc_weight'])
 
         score = remaining_btc_ratio + \
             results_df['Total Profit'].std() / results_df['Total Profit'].min()
